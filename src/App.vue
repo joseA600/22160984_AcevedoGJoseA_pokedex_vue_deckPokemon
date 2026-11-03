@@ -3,16 +3,20 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import PokemonCard, { type Pokemon } from './components/PokemonCard.vue'
 
-const POKEMON_IDS = [
-  1, 4, 7, 25, 39, 52, 54, 58, 59, 63,
-  65, 68, 92, 94, 95, 104, 123, 129, 130, 131,
-  132, 133, 134, 135, 136, 143, 144, 145, 146, 149,
-  150, 151, 152, 155, 158, 175, 196, 197, 248, 249
-]
+const TOTAL_CARTAS = 40
+const MAX_ID = 1025
 
 const pokemons = ref<Pokemon[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const generateRandomIds = (count: number): number[] => {
+  const ids = new Set<number>()
+  while (ids.size < count) {
+    ids.add(Math.floor(Math.random() * MAX_ID) + 1)
+  }
+  return [...ids]
+}
 
 const toCard = (data: any): Pokemon => {
   const abilities: string[] = data.abilities.map((a: any) => a.ability.name)
@@ -30,7 +34,8 @@ const toCard = (data: any): Pokemon => {
     image:
       data.sprites.other?.['official-artwork']?.front_default ??
       data.sprites.other?.home?.front_default ??
-      data.sprites.front_default,
+      data.sprites.front_default ??
+      `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${data.id}.png`,
     types: data.types.map((t: any) => t.type.name),
     hp: data.stats.find((s: any) => s.stat.name === 'hp')?.base_stat ?? 50,
     height: data.height,
@@ -44,8 +49,9 @@ const fetchDeck = async () => {
   loading.value = true
   error.value = null
   try {
+    const ids = generateRandomIds(TOTAL_CARTAS)
     const responses = await Promise.all(
-      POKEMON_IDS.map((id) => axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`)),
+      ids.map((id) => axios.get(`https://pokeapi.co/api/v2/pokemon/${id}`)),
     )
     pokemons.value = responses.map((r) => toCard(r.data))
   } catch (err) {
@@ -65,11 +71,14 @@ onMounted(() => {
   <div class="page">
     <header class="header">
       <h1>Pokédex 40 cartas</h1>
+      <button class="new-deck-btn" :disabled="loading" @click="fetchDeck">
+        {{ loading ? 'Generando...' : 'Nuevo mazo' }}
+      </button>
     </header>
 
     <main class="content-area">
       <div v-if="loading" class="status">
-        <p>Cargando 40 cartas...</p>
+        <p>Cargando 40 cartas aleatorias...</p>
       </div>
 
       <div v-else-if="error" class="status error">
@@ -100,6 +109,9 @@ onMounted(() => {
 .header {
   max-width: 1400px;
   margin: 0 auto 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 h1 {
@@ -107,6 +119,28 @@ h1 {
   font-size: 1.8rem;
   font-weight: bold;
   color: #111111;
+}
+
+.new-deck-btn {
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  background-color: #ffffff;
+  color: #111111;
+  border: 2px solid #111111;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.new-deck-btn:hover:not(:disabled) {
+  background-color: #111111;
+  color: #ffffff;
+}
+
+.new-deck-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .content-area {
@@ -137,6 +171,11 @@ h1 {
 }
 
 @media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
   h1 {
     font-size: 1.4rem;
   }
